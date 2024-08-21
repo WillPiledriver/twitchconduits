@@ -1,6 +1,3 @@
-"""Linter appeasement"""
-# TODO: Update Conduit Shards
-
 import asyncio
 from typing import List, Dict
 import hashlib
@@ -10,14 +7,14 @@ import httpx
 
 class Transport():
     """Transport class"""
-    def __init__(self, key="", secret=None):
+    def __init__(self, callback_url, key="", secret=None):
         self.method = "webhook"
         self.key = key
         if secret is None:
             self.secret = hashlib.sha256(f"{secrets.token_bytes(32).hex()}:{key}".encode()).hexdigest()
         else:
             self.secret = secret
-        self.callback = f"https://willpile.com/streamscripts/callback/{self.secret}"
+        self.callback = f"{callback_url}{self.secret}"
 
     def to_dict(self):
         """Return a dictionary"""
@@ -30,12 +27,12 @@ class Transport():
 
 class Shard():
     """Shard Class"""
-    def __init__(self, shard_id, access_token, key="", transport=None, session_id=None, status=None):
+    def __init__(self, shard_id, access_token, callback_url, key="", transport=None, session_id=None, status=None):
         self.id = shard_id
         self.key = key
         self.access_token = access_token
         if transport is None:
-            self.transport = Transport(key=key)
+            self.transport = Transport(callback_url=callback_url, key=key)
         else:
             self.transport = transport
         self.session_id = session_id
@@ -65,10 +62,11 @@ class Shard():
 
 class Conduit():
     """Conduit Class"""
-    def __init__(self, conduit_id, shard_count, access_token, client_id):
+    def __init__(self, conduit_id, shard_count, access_token, client_id, callback_url):
         self.id = conduit_id
         self.shard_count = shard_count
         self.access_token = access_token
+        self.callback_url = callback_url
         self.client_id = client_id
         self.shards : List[Shard] = []
         self.on_delete = None
@@ -171,8 +169,10 @@ class Conduit():
             Shard(
                 shard_id=s["id"],
                 access_token=self.access_token,
-                transport=Transport(secret=s["transport"]["callback"].rsplit('/', 1)[-1]),
-                status=s["status"]
+                transport=Transport(callback_url=self.callback_url,
+                                    secret=s["transport"]["callback"].rsplit('/', 1)[-1]),
+                status=s["status"],
+                callback_url=self.callback_url
             )
             for s in shards_data
         ]
@@ -224,7 +224,7 @@ class Conduit():
             "Client-Id": self.client_id,
             "Content-Type": "application/json"
         }
-        
+
         new_shards = []
         for i, s in enumerate(shards):
             cleaned_shard = {key: value for key, value in s.items() if value is not None}
@@ -257,9 +257,10 @@ class Conduit():
 
 class Conduits():
     """This is for handling Twitch Conduit requests"""
-    def __init__(self, client_id, client_secret):
+    def __init__(self, client_id, client_secret, callback_url):
         self.client_id = client_id
         self.client_secret = client_secret
+        self.callback_url = callback_url
         self.conduits : List[Conduit] = []
         self.access_token = None
 
@@ -319,7 +320,7 @@ class Conduits():
         if response.status_code == 200:
             r = response.json()
             new_conduit = Conduit(r["data"][0]["id"], r["data"][0]["shard_count"],
-                                  self.access_token, self.client_id)
+                                  self.access_token, self.client_id, callback_url=self.callback_url)
             new_conduit.on_delete = self._on_conduit_delete
             self.conduits.append(new_conduit)
             return new_conduit
@@ -333,6 +334,7 @@ class Conduits():
 
         for conduit in conduits["data"]:
             c = Conduit(conduit["id"], conduit["shard_count"],
-                                         self.access_token, self.client_id)
+                        self.access_token, self.client_id,
+                        callback_url=self.callback_url)
             c.on_delete = self._on_conduit_delete
             self.conduits.append(c)
