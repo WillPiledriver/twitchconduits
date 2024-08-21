@@ -10,10 +10,13 @@ import httpx
 
 class Transport():
     """Transport class"""
-    def __init__(self, key):
+    def __init__(self, key="", secret=None):
         self.method = "webhook"
         self.key = key
-        self.secret = hashlib.sha256(f"{secrets.token_bytes(32).hex()}:{key}".encode()).hexdigest()
+        if secret is None:
+            self.secret = hashlib.sha256(f"{secrets.token_bytes(32).hex()}:{key}".encode()).hexdigest()
+        else:
+            self.secret = secret
         self.callback = f"https://willpile.com/streamscripts/callback/{self.secret}"
 
     def to_dict(self):
@@ -27,13 +30,16 @@ class Transport():
 
 class Shard():
     """Shard Class"""
-    def __init__(self, shard_id, access_token, key):
+    def __init__(self, shard_id, access_token, key="", transport=None, session_id=None, status=None):
         self.id = shard_id
         self.key = key
         self.access_token = access_token
-        self.transport = Transport(key)
-        self.session_id = None
-        self.status = None
+        if transport is None:
+            self.transport = Transport(key=key)
+        else:
+            self.transport = transport
+        self.session_id = session_id
+        self.status = status
 
     def update_from_dict(self, data: dict):
         """Update Shard instance from a dictionary."""
@@ -131,37 +137,47 @@ class Conduit():
             "Client-Id": self.client_id
         }
 
-        after = ""
-        pagination = None
-        shards_data = []
-        while pagination is None or ("cursor" in pagination and pagination["cursor"]):
+        async with httpx.AsyncClient() as client:
+            shards_data = []
+            after = ""
             while True:
                 try:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(
-                            f"https://api.twitch.tv/helix/eventsub/conduits/shards?conduit_id={self.id}&status={status}&after={after}",
-                            headers=headers
-                        )
+                    response = await client.get(
+                        "https://api.twitch.tv/helix/eventsub/conduits/shards",
+                        headers=headers,
+                        params={"conduit_id": self.id, "status": status, "after": after}
+                    )
 
                     if response.status_code == 200:
                         r = response.json()
                         shards_data.extend(r["data"])
                         pagination = r.get("pagination", {})
-                        print(pagination)
 
-                        # Check for cursor in pagination and update `after`
+                        # Update `after` if there's a cursor for pagination
                         if "cursor" in pagination:
                             after = pagination["cursor"]
                         else:
-                            after = ""
-                        break  # Exit the inner loop if successful
+                            break  # Exit the loop if no more pages
+
                     else:
                         response.raise_for_status()
+
                 except httpx.ConnectTimeout:
                     print("Connection timed out. Retrying...")
                     await asyncio.sleep(1)
 
-        return shards_data
+        # Transform the shard data into Shard objects
+        fixed_shards = [
+            Shard(
+                shard_id=s["id"],
+                access_token=self.access_token,
+                transport=Transport(secret=s["transport"]["callback"].rsplit('/', 1)[-1]),
+                status=s["status"]
+            )
+            for s in shards_data
+        ]
+
+        return fixed_shards
 
     async def create_shard(self, key):
         """Create a new Shard"""
