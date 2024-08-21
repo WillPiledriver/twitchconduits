@@ -32,14 +32,14 @@ This project provides a Python-based solution to manage Twitch EventSub Conduits
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/yourusername/twitch-conduit-manager.git
-   cd twitch-conduit-manager
+   git clone https://github.com/WillPiledriver/twitchconduits.git
+   cd twitchconduits
    ```
 
 2. **Install dependencies:**
 
    ```bash
-   pip install -r requirements.txt
+   pip install httpx
    ```
 
 3. **Set up environment variables:**
@@ -53,7 +53,7 @@ To start using the Conduit Manager, you can follow the example below:
 
 ```python
 import asyncio
-from your_module import Conduits
+from twitchconduits import Conduits
 
 async def main():
     client_id = "your_client_id"
