@@ -189,7 +189,7 @@ class Conduit():
 
         if len(self.shards) == self.shard_count:
             await self.update_conduit(self.shard_count+1)
-        new_shard = Shard(self.shard_count-1, self.access_token, key)
+        new_shard = Shard(len(self.shards), self.access_token, key)
 
         payload = {
             "conduit_id": self.id,
@@ -216,9 +216,43 @@ class Conduit():
                 print("Connection timed out. Retrying...")
                 await asyncio.sleep(1)
 
-    async def update_shards(self):
-        """Update Conduit Shards"""
-        pass
+    async def update_shards(self, shards):
+        """Update shards for a Conduit"""
+        url = "https://api.twitch.tv/helix/eventsub/conduits/shards"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Client-Id": self.client_id,
+            "Content-Type": "application/json"
+        }
+        
+        new_shards = []
+        for i, s in enumerate(shards):
+            cleaned_shard = {key: value for key, value in s.items() if value is not None}
+            new_shards.append(cleaned_shard)
+
+        data = {
+            "conduit_id": self.id,
+            "shards": new_shards
+        }
+
+        async with httpx.AsyncClient() as client:
+            while True:
+                try:
+                    response = await client.patch(
+                        url,
+                        headers=headers,
+                        json=data
+                    )
+
+                    if response.status_code == 202:
+                        print(f"Shards updated for conduit {self.id}")
+                        return response.json()
+                    else:
+                        response.raise_for_status()
+
+                except httpx.ConnectTimeout:
+                    print("Connection timed out. Retrying...")
+                    await asyncio.sleep(1)
 
 
 class Conduits():
