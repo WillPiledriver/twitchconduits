@@ -1,75 +1,133 @@
 # Twitch EventSub Conduit Manager
 
-This project is a Python-based utility for managing Twitch EventSub Conduits. It allows for the creation, retrieval, and deletion of conduits and their associated shards using Twitch's Helix API.
+This project provides a Python-based solution to manage Twitch EventSub Conduits and their associated shards. The system allows for creating, updating, and deleting conduits and shards, and automates interactions with the Twitch API.
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Classes and Methods](#classes-and-methods)
+  - [Transport](#transport)
+  - [Shard](#shard)
+  - [Conduit](#conduit)
+  - [Conduits](#conduits)
+- [License](#license)
 
 ## Features
 
-- **Conduit Management**: Create, retrieve, and delete Twitch EventSub Conduits.
-- **Shard Handling**: Manage shards associated with conduits.
-- **Async HTTP Requests**: Utilizes `httpx` for asynchronous API requests to Twitch.
+- **Manage Twitch EventSub Conduits:** Create, update, and delete conduits using the Twitch API.
+- **Shard Management:** Dynamically create and update shards within conduits.
+- **Retry Mechanism:** Automatic retries for API requests that experience timeouts.
+- **Callback Handling:** Supports custom callback handling when conduits are deleted.
 
-## Classes
+## Requirements
 
-### `Shard`
-Represents a shard associated with a conduit.
+- Python 3.8+
+- `httpx` for making asynchronous HTTP requests
 
-### `Conduit`
-Represents a Twitch EventSub Conduit with methods to manage its lifecycle.
+## Installation
 
-- **Attributes**:
-  - `conduit_id`: Unique identifier for the conduit.
-  - `shard_count`: Number of shards associated with the conduit.
-  - `access_token`: OAuth token for API authentication.
-  - `client_id`: Client ID for the Twitch app.
-  - `shards`: List of `Shard` objects.
+1. **Clone the repository:**
 
-- **Methods**:
-  - `delete_conduit()`: Deletes the conduit via the Twitch API.
+   ```bash
+   git clone https://github.com/yourusername/twitch-conduit-manager.git
+   cd twitch-conduit-manager
+   ```
 
-### `Conduits`
-Manages multiple `Conduit` objects and handles interactions with the Twitch API.
+2. **Install dependencies:**
 
-- **Attributes**:
-  - `client_id`: Client ID for the Twitch app.
-  - `client_secret`: Client Secret for the Twitch app.
-  - `conduits`: List of `Conduit` objects.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- **Methods**:
-  - `get_conduits()`: Fetches a list of existing conduits from Twitch.
-  - `create_conduit(shard_count)`: Creates a new conduit with the specified number of shards.
-  - `start()`: Initializes the manager by fetching conduits and retrieving an access token.
+3. **Set up environment variables:**
+
+   - `TWITCH_CLIENT_ID`: Your Twitch Client ID
+   - `TWITCH_CLIENT_SECRET`: Your Twitch Client Secret
 
 ## Usage
 
-1. **Install dependencies**:
-    ```bash
-    pip install httpx
-    ```
+To start using the Conduit Manager, you can follow the example below:
 
-2. **Initialize and Start**:
+```python
+import asyncio
+from your_module import Conduits
 
-    ```python
-    import asyncio
-    from conduits import Conduits
+async def main():
+    client_id = "your_client_id"
+    client_secret = "your_client_secret"
+    shard_count = 5
 
-    async def main():
-        conduits_manager = Conduits(client_id="your_client_id", client_secret="your_client_secret")
-        await conduits_manager.start()
-    
-    asyncio.run(main())
-    ```
+    conduits = Conduits(client_id, client_secret)
+    await conduits.start()
+    new_conduit = await conduits.create_conduit(shard_count)
+    await new_conduit.create_shard("shard_key")
 
-3. **Create a New Conduit**:
-    ```python
-    await conduits_manager.create_conduit(shard_count=2)
-    ```
+asyncio.run(main())
+```
 
-4. **Delete a Conduit**:
-    ```python
-    for conduit in conduits_manager.conduits:
-        await conduit.delete_conduit()
-    ```
+## Classes and Methods
+
+### `Transport`
+
+- **Attributes:**
+  - `method`: The method used for the transport (default: `webhook`).
+  - `key`: A unique key for identifying the transport.
+  - `secret`: A generated SHA-256 hash secret.
+  - `callback`: A URL callback for the transport.
+
+- **Methods:**
+  - `to_dict()`: Returns the transport data as a dictionary.
+
+### `Shard`
+
+- **Attributes:**
+  - `id`: The shard ID.
+  - `key`: A unique key for identifying the shard.
+  - `access_token`: Twitch API access token.
+  - `transport`: A `Transport` instance for the shard.
+  - `session_id`: The session ID for the shard.
+  - `status`: The status of the shard.
+
+- **Methods:**
+  - `update_from_dict(data)`: Updates the shard attributes from a dictionary.
+  - `to_dict()`: Converts the shard object to a dictionary.
+
+### `Conduit`
+
+- **Attributes:**
+  - `id`: The conduit ID.
+  - `shard_count`: The number of shards in the conduit.
+  - `access_token`: Twitch API access token.
+  - `client_id`: The Twitch client ID.
+  - `shards`: A list of `Shard` objects associated with the conduit.
+  - `on_delete`: A callback function to be called when the conduit is deleted.
+
+- **Methods:**
+  - `to_dict()`: Converts the conduit object to a dictionary.
+  - `update_conduit(shard_count)`: Updates the shard count for the conduit.
+  - `delete_conduit()`: Deletes the conduit.
+  - `get_shards(status)`: Retrieves the shard information.
+  - `create_shard(key)`: Creates a new shard.
+  - `update_shards()`: Placeholder method for updating shards.
+
+### `Conduits`
+
+- **Attributes:**
+  - `client_id`: The Twitch client ID.
+  - `client_secret`: The Twitch client secret.
+  - `conduits`: A list of `Conduit` objects.
+  - `access_token`: Twitch API access token.
+
+- **Methods:**
+  - `_on_conduit_delete(conduit)`: A callback function that removes the conduit from the list when deleted.
+  - `get_app_access_token()`: Retrieves the Twitch application access token.
+  - `get_conduits()`: Retrieves the list of conduits.
+  - `create_conduit(shard_count)`: Creates a new conduit with the specified shard count.
+  - `start()`: Initializes the Conduit Manager by retrieving the access token and existing conduits.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. See the `LICENSE` file for more details.

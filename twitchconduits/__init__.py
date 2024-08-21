@@ -7,6 +7,7 @@ import hashlib
 import secrets
 import httpx
 
+
 class Transport():
     """Transport class"""
     def __init__(self, key):
@@ -22,6 +23,7 @@ class Transport():
             "callback": self.callback,
             "secret": self.secret
         }
+
 
 class Shard():
     """Shard Class"""
@@ -54,6 +56,7 @@ class Shard():
             "session_id": self.session_id,
         }
 
+
 class Conduit():
     """Conduit Class"""
     def __init__(self, conduit_id, shard_count, access_token, client_id):
@@ -82,7 +85,6 @@ class Conduit():
             "id": self.id,
             "shard_count": shard_count
         }
-
 
         while True:  # Loop until successful
             try:
