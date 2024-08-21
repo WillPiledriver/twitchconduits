@@ -1,6 +1,7 @@
 """Linter appeasement"""
 # TODO: Update Conduit Shards
 
+import asyncio
 from typing import List, Dict
 import hashlib
 import secrets
@@ -31,7 +32,19 @@ class Shard():
         self.transport = Transport(key)
         self.session_id = None
         self.status = None
-    
+
+    def update_from_dict(self, data: dict):
+        """Update Shard instance from a dictionary."""
+        self.id = data.get("id", self.id)
+        self.status = data.get("status", self.status)
+        self.session_id = data.get("session_id", self.session_id)
+
+        transport_data = data.get("transport", {})
+        if transport_data:
+            self.transport.method = transport_data.get("method", self.transport.method)
+            self.transport.callback = transport_data.get("callback", self.transport.callback)
+            self.transport.secret = transport_data.get("secret", self.transport.secret)
+
     def to_dict(self):
         """Convert Shard object to a dictionary."""
         return {
@@ -70,16 +83,24 @@ class Conduit():
             "shard_count": shard_count
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.patch("https://api.twitch.tv/helix/eventsub/conduits",
-                                          headers=headers, json=data)
 
-        if response.status_code == 200:
-            print(f"Conduit {self.id} shard count updated to {shard_count}")
-            self.shard_count = shard_count
-            return self
-        print(response.json())
-        response.raise_for_status()
+        while True:  # Loop until successful
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.patch(
+                        "https://api.twitch.tv/helix/eventsub/conduits",
+                        headers=headers,
+                        json=data
+                    )
+
+                if response.status_code == 200:
+                    print(f"Conduit {self.id} shard count updated to {shard_count}")
+                    self.shard_count = shard_count
+                    return self
+                response.raise_for_status()
+            except httpx.ConnectTimeout:
+                print("Connection timed out. Retrying...")
+                await asyncio.sleep(1)
 
     async def delete_conduit(self):
         """Delete a Twitch EventSub conduit."""
@@ -101,27 +122,46 @@ class Conduit():
         print(response.json())
         response.raise_for_status()
 
-    async def get_shards(self, status="", after=""):
+    async def get_shards(self, status=""):
         """Retrieve the shard information for a Conduit"""
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Client-Id": self.client_id
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"https://api.twitch.tv/helix/eventsub/conduits/shards?conduit_id={self.id}&status={status}&after={after}",
-                headers=headers
-            )
+        after = ""
+        pagination = None
+        shards_data = []
+        while pagination is None or ("cursor" in pagination and pagination["cursor"]):
+            while True:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(
+                            f"https://api.twitch.tv/helix/eventsub/conduits/shards?conduit_id={self.id}&status={status}&after={after}",
+                            headers=headers
+                        )
 
-        if response.status_code == 200:
-            shards_data = response.json()
-            print(f"Shard information for conduit {self.id}: {shards_data}")
-            return shards_data
-        print(response.json())
-        response.raise_for_status()
-    
-    async def create_shard(self):
+                    if response.status_code == 200:
+                        r = response.json()
+                        shards_data.extend(r["data"])
+                        pagination = r.get("pagination", {})
+                        print(pagination)
+
+                        # Check for cursor in pagination and update `after`
+                        if "cursor" in pagination:
+                            after = pagination["cursor"]
+                        else:
+                            after = ""
+                        break  # Exit the inner loop if successful
+                    else:
+                        response.raise_for_status()
+                except httpx.ConnectTimeout:
+                    print("Connection timed out. Retrying...")
+                    await asyncio.sleep(1)
+
+        return shards_data
+
+    async def create_shard(self, key):
         """Create a new Shard"""
         headers = {
             "Authorization": f"Bearer {self.access_token}",
@@ -129,26 +169,34 @@ class Conduit():
             "Content-Type": "application/json"
         }
 
-        new_shard = Shard(self.shard_count-1, self.access_token, "key")
+        if len(self.shards) == self.shard_count:
+            await self.update_conduit(self.shard_count+1)
+        new_shard = Shard(self.shard_count-1, self.access_token, key)
 
         payload = {
             "conduit_id": self.id,
             "shards": [new_shard.to_dict()]
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.patch(
-                "https://api.twitch.tv/helix/eventsub/conduits/shards",
-                headers=headers,
-                json=payload
-            )
+        while True:
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.patch(
+                        "https://api.twitch.tv/helix/eventsub/conduits/shards",
+                        headers=headers,
+                        json=payload
+                    )
 
-        if response.status_code == 202:
-            print(f"Shards created for conduit {self.id}")
-            self.shard_count += 1
-            return response.json()
-        print(response.json())
-        response.raise_for_status()
+                if response.status_code == 202:
+                    print(f"Shards created for conduit {self.id}")
+                    new_shard.update_from_dict(response.json())
+                    self.shards.append(new_shard)
+                    return response.json()
+                print(response.json())
+                response.raise_for_status()
+            except httpx.ConnectTimeout:
+                print("Connection timed out. Retrying...")
+                await asyncio.sleep(1)
 
     async def update_shards(self):
         """Update Conduit Shards"""
@@ -200,7 +248,7 @@ class Conduits():
             return response.json()
         print(response.json())
         response.raise_for_status()
-        
+
     async def create_conduit(self, shard_count):
         """Create Conduit for webhooks"""
         headers = {
@@ -229,9 +277,10 @@ class Conduits():
     async def start(self):
         """Start the conduit."""
         self.access_token = await self.get_app_access_token()
-        print(self.access_token)
         conduits = await self.get_conduits()
 
         for conduit in conduits["data"]:
-            self.conduits.append(Conduit(conduit["id"], conduit["shard_count"],
-                                         self.access_token, self.client_id))
+            c = Conduit(conduit["id"], conduit["shard_count"],
+                                         self.access_token, self.client_id)
+            c.on_delete = self._on_conduit_delete
+            self.conduits.append(c)
