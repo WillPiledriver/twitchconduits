@@ -1,18 +1,50 @@
 """Linter appeasement"""
-# TODO: Get Shards, Update Conduits, Update Conduit Shards
+# TODO: Update Conduit Shards
 
 from typing import List, Dict
+import hashlib
+import secrets
 import httpx
+
+class Transport():
+    """Transport class"""
+    def __init__(self, key):
+        self.method = "webhook"
+        self.key = key
+        self.secret = hashlib.sha256(f"{secrets.token_bytes(32).hex()}:{key}".encode()).hexdigest()
+        self.callback = f"https://willpile.com/streamscripts/callback/{self.secret}"
+
+    def to_dict(self):
+        """Return a dictionary"""
+        return {
+            "method": self.method,
+            "callback": self.callback,
+            "secret": self.secret
+        }
 
 class Shard():
     """Shard Class"""
-    def __init__(self):
-        pass
+    def __init__(self, shard_id, access_token, key):
+        self.id = shard_id
+        self.key = key
+        self.access_token = access_token
+        self.transport = Transport(key)
+        self.session_id = None
+        self.status = None
+    
+    def to_dict(self):
+        """Convert Shard object to a dictionary."""
+        return {
+            "id": self.id,
+            "transport": self.transport.to_dict(),
+            "status": self.status,
+            "session_id": self.session_id,
+        }
 
 class Conduit():
     """Conduit Class"""
     def __init__(self, conduit_id, shard_count, access_token, client_id):
-        self.conduit_id = conduit_id
+        self.id = conduit_id
         self.shard_count = shard_count
         self.access_token = access_token
         self.client_id = client_id
@@ -22,7 +54,7 @@ class Conduit():
     def to_dict(self) -> Dict:
         """Convert Conduit object to a dictionary."""
         return {
-            "conduit_id": self.conduit_id,
+            "conduit_id": self.id,
             "shard_count": self.shard_count
         }
 
@@ -34,7 +66,7 @@ class Conduit():
             "Content-Type": "application/json"
         }
         data = {
-            "id": self.conduit_id,
+            "id": self.id,
             "shard_count": shard_count
         }
 
@@ -43,15 +75,16 @@ class Conduit():
                                           headers=headers, json=data)
 
         if response.status_code == 200:
-            print(f"Conduit {self.conduit_id} shard count updated to {shard_count}")
+            print(f"Conduit {self.id} shard count updated to {shard_count}")
             self.shard_count = shard_count
             return self
+        print(response.json())
         response.raise_for_status()
 
     async def delete_conduit(self):
         """Delete a Twitch EventSub conduit."""
 
-        url = f"https://api.twitch.tv/helix/eventsub/conduits?id={self.conduit_id}"
+        url = f"https://api.twitch.tv/helix/eventsub/conduits?id={self.id}"
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Client-Id": self.client_id
@@ -61,11 +94,66 @@ class Conduit():
             response = await client.delete(url, headers=headers)
 
         if response.status_code == 204:
-            print(f"Conduit {self.conduit_id} deleted successfully.")
+            print(f"Conduit {self.id} deleted successfully.")
             if self.on_delete:
                 self.on_delete(self)
             return True
+        print(response.json())
         response.raise_for_status()
+
+    async def get_shards(self, status="", after=""):
+        """Retrieve the shard information for a Conduit"""
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Client-Id": self.client_id
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://api.twitch.tv/helix/eventsub/conduits/shards?conduit_id={self.id}&status={status}&after={after}",
+                headers=headers
+            )
+
+        if response.status_code == 200:
+            shards_data = response.json()
+            print(f"Shard information for conduit {self.id}: {shards_data}")
+            return shards_data
+        print(response.json())
+        response.raise_for_status()
+    
+    async def create_shard(self):
+        """Create a new Shard"""
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Client-Id": self.client_id,
+            "Content-Type": "application/json"
+        }
+
+        new_shard = Shard(self.shard_count-1, self.access_token, "key")
+
+        payload = {
+            "conduit_id": self.id,
+            "shards": [new_shard.to_dict()]
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(
+                "https://api.twitch.tv/helix/eventsub/conduits/shards",
+                headers=headers,
+                json=payload
+            )
+
+        if response.status_code == 202:
+            print(f"Shards created for conduit {self.id}")
+            self.shard_count += 1
+            return response.json()
+        print(response.json())
+        response.raise_for_status()
+
+    async def update_shards(self):
+        """Update Conduit Shards"""
+        pass
+
 
 class Conduits():
     """This is for handling Twitch Conduit requests"""
@@ -94,6 +182,7 @@ class Conduits():
         if response.status_code == 200:
             tokens = response.json()
             return tokens.get('access_token')
+        print(response.json())
         response.raise_for_status()
 
     async def get_conduits(self):
@@ -109,6 +198,7 @@ class Conduits():
 
         if response.status_code == 200:
             return response.json()
+        print(response.json())
         response.raise_for_status()
         
     async def create_conduit(self, shard_count):
@@ -133,6 +223,7 @@ class Conduits():
             new_conduit.on_delete = self._on_conduit_delete
             self.conduits.append(new_conduit)
             return new_conduit
+        print(response.json())
         response.raise_for_status()
 
     async def start(self):
