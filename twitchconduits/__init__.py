@@ -229,7 +229,7 @@ class Conduit():
                 print("Connection timed out. Retrying...")
                 await asyncio.sleep(1)
 
-    async def create_subscription(self, secret, subscription, condition):
+    async def create_subscription(self, subscription, condition):
         """Create a subscription"""
         if subscription in sub_dict:
             url = "https://api.twitch.tv/helix/eventsub/subscriptions"
@@ -240,7 +240,7 @@ class Conduit():
             }
             data = {
                 "type": subscription,
-                "version": sub_dict[subscription],
+                "version": sub_dict[subscription]["version"],
                 "condition": condition,
                 "transport": {
                     "method": "conduit",
@@ -260,7 +260,8 @@ class Conduit():
                         else:
                             print(f"Failed to create subscription. Status: {response.status_code}")
                             print(f"Error details: {response.json()}")
-                            response.raise_for_status()
+                            return False
+                            # response.raise_for_status()
 
                     except httpx.ConnectTimeout:
                         print("Connection timed out. Retrying...")
@@ -443,13 +444,17 @@ class Conduits():
     async def clean_up_subscriptions(self):
         """Clean up subscriptions"""
         subs = await self.get_subscriptions()
+        to_delete = [sub["id"] for sub in subs if sub["status"] != "enabled"]
         deleted = []
 
-        for sub in subs:
-            if sub["status"] != "enabled":
-                if await self.delete_subscription(sub["id"]):
-                    deleted.append(sub["id"])
-                    print(f"Subsciption {sub["id"]} purged.")
+        async def delete_and_track(sid):
+            if await self.delete_subscription(sid):  # Assuming delete_subscription returns True on success
+                deleted.append(sid)
+            return True
+
+        # Run all delete requests concurrently
+        await asyncio.gather(*[delete_and_track(sid) for sid in to_delete])
+
         return deleted
 
     async def start(self):

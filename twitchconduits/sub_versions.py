@@ -1,76 +1,380 @@
 sub_dict = {
-    "automod.message.hold": 1,
-    "automod.message.update": 1,
-    "automod.settings.update": 1,
-    "automod.terms.update": 1,
-    "channel.update": 2,
-    "channel.follow": 2,
-    "channel.ad_break.begin": 1,
-    "channel.chat.clear": 1,
-    "channel.chat.clear_user_messages": 1,
-    "channel.chat.message": 1,
-    "channel.chat.message_delete": 1,
-    "channel.chat.notification": 1,
-    "channel.chat_settings.update": 1,
-    "channel.chat.user_message_hold": 1,
-    "channel.chat.user_message_update": 1,
-    "channel.subscribe": 1,
-    "channel.subscription.end": 1,
-    "channel.subscription.gift": 1,
-    "channel.subscription.message": 1,
-    "channel.cheer": 1,
-    "channel.raid": 1,
-    "channel.ban": 1,
-    "channel.unban": 1,
-    "channel.unban_request.create": 1,
-    "channel.unban_request.resolve": 1,
-    "channel.moderate": 2,
-    "channel.moderator.add": 1,
-    "channel.moderator.remove": 1,
-    "channel.guest_star_session.begin": "beta",
-    "channel.guest_star_session.end": "beta",
-    "channel.guest_star_guest.update": "beta",
-    "channel.guest_star_settings.update": "beta",
-    "channel.channel_points_automatic_reward_redemption.add": 1,
-    "channel.channel_points_custom_reward.add": 1,
-    "channel.channel_points_custom_reward.update": 1,
-    "channel.channel_points_custom_reward.remove": 1,
-    "channel.channel_points_custom_reward_redemption.add": 1,
-    "channel.channel_points_custom_reward_redemption.update": 1,
-    "channel.poll.begin": 1,
-    "channel.poll.progress": 1,
-    "channel.poll.end": 1,
-    "channel.prediction.begin": 1,
-    "channel.prediction.progress": 1,
-    "channel.prediction.lock": 1,
-    "channel.prediction.end": 1,
-    "channel.suspicious_user.message": 1,
-    "channel.suspicious_user.update": 1,
-    "channel.vip.add": 1,
-    "channel.vip.remove": 1,
-    "channel.warning.acknowledge": 1,
-    "channel.warning.send": 1,
-    "channel.charity_campaign.donate": 1,
-    "channel.charity_campaign.start": 1,
-    "channel.charity_campaign.progress": 1,
-    "channel.charity_campaign.stop": 1,
-    "conduit.shard.disabled": 1,
-    "drop.entitlement.grant": 1,
-    "extension.bits_transaction.create": 1,
-    "channel.goal.begin": 1,
-    "channel.goal.progress": 1,
-    "channel.goal.end": 1,
-    "channel.hype_train.begin": 1,
-    "channel.hype_train.progress": 1,
-    "channel.hype_train.end": 1,
-    "channel.shield_mode.begin": 1,
-    "channel.shield_mode.end": 1,
-    "channel.shoutout.create": 1,
-    "channel.shoutout.receive": 1,
-    "stream.online": 1,
-    "stream.offline": 1,
-    "user.authorization.grant": 1,
-    "user.authorization.revoke": 1,
-    "user.update": 1,
-    "user.whisper.message": 1
+    "automod.message.hold": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "automod.message.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "automod.settings.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "automod.terms.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.update": {
+        "version": 2,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.follow": {
+        "version": 2,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.ad_break.begin": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.chat.clear": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat.clear_user_messages": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat.message": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat.message_delete": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat.notification": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat_settings.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat.user_message_hold": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.chat.user_message_update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "user_id"
+        ]},
+    "channel.subscribe": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.subscription.end": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.subscription.gift": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.subscription.message": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.cheer": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.raid": {
+        "version": 1,
+        "conditions": [
+            "from_broadcaster_user_id",
+            "to_broadcaster_user_id"
+        ]},
+    "channel.ban": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.unban": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.unban_request.create": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.unban_request.resolve": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.moderate": {
+        "version": 2,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.moderator.add": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.moderator.remove": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.guest_star_session.begin": {
+        "version": "beta",
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.guest_star_session.end": {
+        "version": "beta",
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.guest_star_guest.update": {
+        "version": "beta",
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.guest_star_settings.update": {
+        "version": "beta",
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
+    "channel.channel_points_automatic_reward_redemption.add": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.channel_points_custom_reward.add": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.channel_points_custom_reward.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "reward_id"
+        ]},
+    "channel.channel_points_custom_reward.remove": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "reward_id"
+        ]},
+    "channel.channel_points_custom_reward_redemption.add": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "reward_id"
+        ]},
+    "channel.channel_points_custom_reward_redemption.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "reward_id"
+        ]},
+    "channel.poll.begin": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.poll.progress": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.poll.end": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.prediction.begin": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.prediction.progress": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.prediction.lock": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.prediction.end": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.suspicious_user.message": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderate_user_id"
+        ]},
+    "channel.suspicious_user.update": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderate_user_id"
+        ]},
+    "channel.vip.add": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.vip.remove": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.warning.acknowledge": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderate_user_id"
+        ]},
+    "channel.warning.send": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id",
+            "moderate_user_id"
+        ]},
+    "conduit.shard.disabled": {
+        "version": 1,
+        "conditions": [
+            "client_id",
+            "conduit_id"
+        ]},
+    "drop.entitlement.grant": {
+        "version": 1,
+        "conditions": [
+            "organization_id",
+            "category_id",
+            "campaign_id"
+        ]},
+    "extension.bits_transaction.create": {
+        "version": 1,
+        "conditions": [
+            "extension_client_id"
+        ]},
+    "channel.goal.begin": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.goal.progress": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.goal.end": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.hype_train.begin": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.hype_train.progress": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.hype_train.end": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "channel.shield_mode.begin": {
+        "version": 1,
+        "conditions": []
+        },
+    "channel.shield_mode.end": {
+        "version": 1,
+        "conditions": []
+        },
+    "channel.shoutout.create": {
+        "version": 1,
+        "conditions": []
+        },
+    "channel.shoutout.receive": {
+        "version": 1,
+        "conditions": []
+        },
+    "stream.online": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "stream.offline": {
+        "version": 1,
+        "conditions": [
+            "broadcaster_user_id"
+        ]},
+    "user.authorization.grant": {
+        "version": 1,
+        "conditions": [
+            "client_id"
+        ]},
+    "user.authorization.revoke": {
+        "version": 1,
+        "conditions": [
+            "client_id"
+        ]},
+    "user.update": {
+        "version": 1,
+        "conditions": [
+            "user_id"
+        ]},
+    "user.whisper.message": {
+        "version": 1,
+        "conditions": [
+            "user_id"
+        ]},
 }
