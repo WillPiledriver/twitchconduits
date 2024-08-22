@@ -229,43 +229,47 @@ class Conduit():
                 print("Connection timed out. Retrying...")
                 await asyncio.sleep(1)
 
-    async def create_subscription(self, subscription, condition):
-        """Create a subscription"""
-        if subscription in sub_dict:
-            url = "https://api.twitch.tv/helix/eventsub/subscriptions"
-            headers = {
-                "Authorization": f"Bearer {self.access_token}",
-                "Client-Id": self.client_id,
-                "Content-Type": "application/json"
-            }
-            data = {
-                "type": subscription,
-                "version": sub_dict[subscription]["version"],
-                "condition": condition,
-                "transport": {
-                    "method": "conduit",
-                    "conduit_id": self.id
+    async def create_subscriptions(self, subscriptions, condition):
+        """Create multiple subscriptions concurrently"""
+        async def create_single_subscription(subscription):
+            """Helper function to create a single subscription"""
+            if subscription in sub_dict:
+                url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+                headers = {
+                    "Authorization": f"Bearer {self.access_token}",
+                    "Client-Id": self.client_id,
+                    "Content-Type": "application/json"
                 }
-            }
+                data = {
+                    "type": subscription,
+                    "version": sub_dict[subscription]["version"],
+                    "condition": {k: d for k, d in condition.items() if k in sub_dict[subscription]["conditions"]},
+                    "transport": {
+                        "method": "conduit",
+                        "conduit_id": self.id
+                    }
+                }
 
-            async with httpx.AsyncClient() as client:
-                while True:
-                    try:
-                        response = await client.post(url, headers=headers, json=data)
+                async with httpx.AsyncClient() as client:
+                    while True:
+                        try:
+                            response = await client.post(url, headers=headers, json=data)
 
-                        if response.status_code == 202:
-                            print("Subscription created successfully!")
-                            print(response.json())
-                            return response.json()
-                        else:
-                            print(f"Failed to create subscription. Status: {response.status_code}")
-                            print(f"Error details: {response.json()}")
-                            return False
-                            # response.raise_for_status()
+                            if response.status_code == 202:
+                                print(f"Subscription '{subscription}' created successfully!")
+                                return response.json()
+                            else:
+                                print(f"Failed to create subscription '{subscription}'. Status: {response.status_code}")
+                                print(f"Error details: {response.json()}")
+                                return False
 
-                    except httpx.ConnectTimeout:
-                        print("Connection timed out. Retrying...")
-                        await asyncio.sleep(1)
+                        except httpx.ConnectTimeout:
+                            print(f"Connection timed out while creating '{subscription}'. Retrying...")
+                            await asyncio.sleep(1)
+
+        # Use asyncio.gather to create all subscriptions concurrently
+        results = await asyncio.gather(*(create_single_subscription(sub) for sub in subscriptions))
+        return results
 
     async def update_shards(self, shards):
         """Update shards for a Conduit"""

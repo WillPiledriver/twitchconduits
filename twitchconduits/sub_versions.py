@@ -115,7 +115,6 @@ sub_dict = {
     "channel.raid": {
         "version": 1,
         "conditions": [
-            "from_broadcaster_user_id",
             "to_broadcaster_user_id"
         ]},
     "channel.ban": {
@@ -253,13 +252,13 @@ sub_dict = {
         "version": 1,
         "conditions": [
             "broadcaster_user_id",
-            "moderate_user_id"
+            "moderator_user_id"
         ]},
     "channel.suspicious_user.update": {
         "version": 1,
         "conditions": [
             "broadcaster_user_id",
-            "moderate_user_id"
+            "moderator_user_id"
         ]},
     "channel.vip.add": {
         "version": 1,
@@ -275,13 +274,13 @@ sub_dict = {
         "version": 1,
         "conditions": [
             "broadcaster_user_id",
-            "moderate_user_id"
+            "moderator_user_id"
         ]},
     "channel.warning.send": {
         "version": 1,
         "conditions": [
             "broadcaster_user_id",
-            "moderate_user_id"
+            "moderator_user_id"
         ]},
     "conduit.shard.disabled": {
         "version": 1,
@@ -333,20 +332,28 @@ sub_dict = {
         ]},
     "channel.shield_mode.begin": {
         "version": 1,
-        "conditions": []
-        },
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
     "channel.shield_mode.end": {
         "version": 1,
-        "conditions": []
-        },
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
     "channel.shoutout.create": {
         "version": 1,
-        "conditions": []
-        },
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
     "channel.shoutout.receive": {
         "version": 1,
-        "conditions": []
-        },
+        "conditions": [
+            "broadcaster_user_id",
+            "moderator_user_id"
+        ]},
     "stream.online": {
         "version": 1,
         "conditions": [
