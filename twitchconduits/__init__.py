@@ -3,6 +3,7 @@ from typing import List, Dict
 import hashlib
 import secrets
 import httpx
+from .sub_versions import sub_dict
 
 
 class Transport():
@@ -69,6 +70,7 @@ class Conduit():
         self.callback_url = callback_url
         self.client_id = client_id
         self.shards : List[Shard] = []
+        self.shards_dict = {}
         self.on_delete = None
 
     def to_dict(self) -> Dict:
@@ -107,6 +109,11 @@ class Conduit():
             except httpx.ConnectTimeout:
                 print("Connection timed out. Retrying...")
                 await asyncio.sleep(1)
+
+    def make_dict(self):
+        """Map the shards to a dictionary"""
+        for i, value in enumerate(self.shards):
+            self.shards_dict[value.transport.secret] = self.shards[i]
 
     async def delete_conduit(self):
         """Delete a Twitch EventSub conduit."""
@@ -177,6 +184,8 @@ class Conduit():
             for s in shards_data
         ]
 
+        self.shards = fixed_shards
+        self.make_dict()
         return fixed_shards
 
     async def create_shard(self, key):
@@ -189,7 +198,10 @@ class Conduit():
 
         if len(self.shards) == self.shard_count:
             await self.update_conduit(self.shard_count+1)
-        new_shard = Shard(len(self.shards), self.access_token, key)
+        new_shard = Shard(len(self.shards), 
+                          self.access_token,
+                          callback_url=self.callback_url,
+                          key=key)
 
         payload = {
             "conduit_id": self.id,
@@ -209,12 +221,50 @@ class Conduit():
                     print(f"Shards created for conduit {self.id}")
                     new_shard.update_from_dict(response.json())
                     self.shards.append(new_shard)
+                    self.shards_dict[new_shard.transport.secret] = self.shards[-1]
                     return response.json()
                 print(response.json())
                 response.raise_for_status()
             except httpx.ConnectTimeout:
                 print("Connection timed out. Retrying...")
                 await asyncio.sleep(1)
+
+    async def create_subscription(self, secret, subscription, condition):
+        """Create a subscription"""
+        if subscription in sub_dict:
+            url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "Client-Id": self.client_id,
+                "Content-Type": "application/json"
+            }
+            data = {
+                "type": subscription,
+                "version": sub_dict[subscription],
+                "condition": condition,
+                "transport": {
+                    "method": "conduit",
+                    "conduit_id": self.id
+                }
+            }
+
+            async with httpx.AsyncClient() as client:
+                while True:
+                    try:
+                        response = await client.post(url, headers=headers, json=data)
+
+                        if response.status_code == 202:
+                            print("Subscription created successfully!")
+                            print(response.json())
+                            return response.json()
+                        else:
+                            print(f"Failed to create subscription. Status: {response.status_code}")
+                            print(f"Error details: {response.json()}")
+                            response.raise_for_status()
+
+                    except httpx.ConnectTimeout:
+                        print("Connection timed out. Retrying...")
+                        await asyncio.sleep(1)
 
     async def update_shards(self, shards):
         """Update shards for a Conduit"""
@@ -326,6 +376,81 @@ class Conduits():
             return new_conduit
         print(response.json())
         response.raise_for_status()
+
+    async def get_subscriptions(self):
+        """Returns a list of subscriptions for a user."""
+        url = 'https://api.twitch.tv/helix/eventsub/subscriptions'
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Client-Id": self.client_id
+        }
+
+        subscriptions_data = []
+        after = ""
+
+        async with httpx.AsyncClient() as client:
+            while True:
+                try:
+                    response = await client.get(
+                        url,
+                        headers=headers,
+                        params={"after": after}
+                    )
+
+                    if response.status_code == 200:
+                        r = response.json()
+                        subscriptions_data.extend(r.get("data", []))
+                        pagination = r.get("pagination", {})
+
+                        # Update `after` if there's a cursor for pagination
+                        if "cursor" in pagination:
+                            after = pagination["cursor"]
+                        else:
+                            break  # Exit the loop if no more pages
+
+                    else:
+                        print(response.json())
+                        response.raise_for_status()
+
+                except httpx.ConnectTimeout:
+                    print("Connection timed out. Retrying...")
+                    await asyncio.sleep(1)
+
+        return subscriptions_data
+
+    async def delete_subscription(self, sub_id):
+        """Delete a subscription"""
+        url = f"https://api.twitch.tv/helix/eventsub/subscriptions?id={sub_id}"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Client-Id": self.client_id
+        }
+
+        async with httpx.AsyncClient() as client:
+            while True:
+                try:
+                    response = await client.delete(url, headers=headers)
+                    if response.status_code == 204:
+                        print("Subscription deleted successfully.")
+                        return True
+                    else:
+                        print(f"Failed to delete subscription: {response.status_code} - {response.text}")
+                        response.raise_for_status()
+                except httpx.ConnectTimeout:
+                    print("Connection timed out. Retrying...")
+                    await asyncio.sleep(1)
+
+    async def clean_up_subscriptions(self):
+        """Clean up subscriptions"""
+        subs = await self.get_subscriptions()
+        deleted = []
+
+        for sub in subs:
+            if sub["status"] != "enabled":
+                if await self.delete_subscription(sub["id"]):
+                    deleted.append(sub["id"])
+                    print(f"Subsciption {sub["id"]} purged.")
+        return deleted
 
     async def start(self):
         """Start the conduit."""
