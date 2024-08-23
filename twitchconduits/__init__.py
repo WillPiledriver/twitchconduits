@@ -16,6 +16,7 @@ async def send_request(method: str, url: str, headers: Dict, json: Dict = None, 
                     return response
                 else:
                     print(f"Request failed: {response.status_code} - {response.text}")
+                    return response
             except httpx.ConnectTimeout:
                 if attempt < retries - 1:
                     print(f"Connection timed out. Retrying... (Attempt {attempt + 1}/{retries})")
@@ -23,6 +24,51 @@ async def send_request(method: str, url: str, headers: Dict, json: Dict = None, 
                 else:
                     raise
     return response
+
+
+class Subscription:
+    """Subscription Class"""
+    def __init__(self, sub_id, user_id):
+        self.id = sub_id
+        self.user_id = user_id
+        self.status = None
+
+    def to_dict(self):
+        """Convert Subscription to dict"""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "status": self.status
+        }
+
+
+class User:
+    """User class"""
+    def __init__(self, key=None, user_id=None, ws=None, subscriptions=None):
+        self.id = user_id
+        self.key = key
+        self.sub_dict = subscriptions
+        self.ws = ws
+
+
+class Users:
+    """Users class"""
+    def __init__(self):
+        self.users = {}
+        self.refresh_tokens = {}
+        self.limbo = set()
+    
+    def add_user(self, key=None, user_id=None, ws=None, subscriptions=None):
+        """Add a user to the users collection"""
+        new_user = User(key, user_id, ws, subscriptions)
+        self.users[user_id] = new_user
+    
+    def get_user(self, key):
+        for k, d in self.users.items():
+            if d.key == key:
+                return self.users[k]
+        return False
+
 
 
 class Transport:
@@ -207,7 +253,7 @@ class Conduit:
                 }
                 response = await send_request("POST", url, headers, json=data)
                 if response.status_code == 202:
-                    print(f"Subscription '{subscription}' created successfully!")
+                    # print(f"Subscription '{subscription}' created successfully!")
                     return response.json()
             return (False, subscription)
 
