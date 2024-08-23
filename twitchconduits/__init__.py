@@ -13,7 +13,7 @@ async def send_request(method: str, url: str, headers: Dict, json: Dict = None, 
             try:
                 response = await client.request(method, url, headers=headers, json=json, params=params)
                 if response.status_code in {200, 202, 204}:
-                    return response.json() if response.status_code != 204 else {}
+                    return response
                 else:
                     print(f"Request failed: {response.status_code} - {response.text}")
             except httpx.ConnectTimeout:
@@ -22,7 +22,7 @@ async def send_request(method: str, url: str, headers: Dict, json: Dict = None, 
                     await asyncio.sleep(1)
                 else:
                     raise
-    return {}
+    return response
 
 
 class Transport:
@@ -105,7 +105,7 @@ class Conduit:
         }
         url = "https://api.twitch.tv/helix/eventsub/conduits"
         response = await send_request("PATCH", url, headers, json=data)
-        if response:
+        if response.status_code == 200:
             print(f"Conduit {self.id} shard count updated to {shard_count}")
             self.shard_count = shard_count
             return self
@@ -122,7 +122,7 @@ class Conduit:
             "Client-Id": self.client_id
         }
         response = await send_request("DELETE", url, headers)
-        if response == {}:
+        if response.status_code == 204:
             print(f"Conduit {self.id} deleted successfully.")
             if self.on_delete:
                 self.on_delete(self)
@@ -141,11 +141,15 @@ class Conduit:
         while True:
             params = {"conduit_id": self.id, "status": status, "after": after}
             response = await send_request("GET", url, headers, params=params)
-            shards_data.extend(response.get("data", []))
-            pagination = response.get("pagination", {})
-            after = pagination.get("cursor")
-            if not after:
-                break
+            if response.status_code == 200:
+                response = response.json()
+                shards_data.extend(response.get("data", []))
+                pagination = response.get("pagination", {})
+                after = pagination.get("cursor")
+                if not after:
+                    break
+            else:
+                response.raise_for_status()
 
         self.shards = [
             Shard(
@@ -174,12 +178,15 @@ class Conduit:
         new_shard = Shard(len(self.shards), self.access_token, callback_url=self.callback_url, key=key)
         payload = {"conduit_id": self.id, "shards": [new_shard.to_dict()]}
         response = await send_request("PATCH", url, headers, json=payload)
-        if response:
+        if response.status_code == 202:
+            response = response.json()
             print(f"Shards created for conduit {self.id}")
             new_shard.update_from_dict(response)
             self.shards.append(new_shard)
             self.shards_dict[new_shard.transport.secret] = new_shard
             return response
+        else:
+            response.raise_for_status()
 
     async def create_subscriptions(self, subscriptions, condition):
         """Create multiple subscriptions concurrently"""
@@ -199,10 +206,10 @@ class Conduit:
                     "transport": {"method": "conduit", "conduit_id": self.id}
                 }
                 response = await send_request("POST", url, headers, json=data)
-                if response:
+                if response.status_code == 202:
                     print(f"Subscription '{subscription}' created successfully!")
-                    return response
-            return False
+                    return response.json()
+            return (False, subscription)
 
         # Use asyncio.gather to create all subscriptions concurrently
         results = await asyncio.gather(*(create_single_subscription(sub) for sub in subscriptions))
@@ -218,7 +225,11 @@ class Conduit:
         }
         new_shards = [{key: value for key, value in s.items() if value is not None} for s in shards]
         data = {"conduit_id": self.id, "shards": new_shards}
-        return await send_request("PATCH", url, headers, json=data)
+        r = await send_request("PATCH", url, headers, json=data)
+        if r.status_code == 202:
+            return r.json()
+        else:
+            r.raise_for_status()
 
 
 class Conduits:
@@ -243,7 +254,8 @@ class Conduits:
             "grant_type": "client_credentials"
         }
         response = await send_request("POST", url, {}, params=params)
-        if response:
+        if response.status_code == 200:
+            response = response.json()
             self.access_token = response.get("access_token")
             return self.access_token
 
@@ -254,17 +266,10 @@ class Conduits:
             "Client-Id": self.client_id
         }
         url = "https://api.twitch.tv/helix/eventsub/conduits"
-        conduits_data = []
-        after = ""
 
-        while True:
-            params = {"after": after}
-            response = await send_request("GET", url, headers, params=params)
-            conduits_data.extend(response.get("data", []))
-            pagination = response.get("pagination", {})
-            after = pagination.get("cursor")
-            if not after:
-                break
+        response = await send_request("GET", url, headers)
+        response = response.json()
+        conduits_data = response.get("data", [])
 
         self.conduits = [Conduit(conduit["id"], conduit["shard_count"], self.access_token, self.client_id, self.callback_url)
                          for conduit in conduits_data]
@@ -284,6 +289,7 @@ class Conduits:
         while True:
             params = {"after": after}
             response = await send_request("GET", url, headers, params=params)
+            response = response.json()
             subscriptions.extend(response.get("data", []))
             pagination = response.get("pagination", {})
             after = pagination.get("cursor")
@@ -301,11 +307,10 @@ class Conduits:
         url = f"https://api.twitch.tv/helix/eventsub/subscriptions?id={sub_id}"
 
         response = await send_request("DELETE", url, headers)
-        if response == {}:
-            print(f"Subscription {sub_id} deleted successfully.")
+        if response.status_code ==  204:
             return True
         else:
-            print(f"Failed to delete subscription {sub_id}. Response: {response}")
+            print(f"Failed to delete subscription {sub_id}. Response: {response.json()}")
             return False
         
     async def clean_up_subscriptions(self):
@@ -330,7 +335,8 @@ class Conduits:
         url = "https://api.twitch.tv/helix/eventsub/conduits"
         data = {"shard_count": shard_count}
         response = await send_request("POST", url, headers, json=data)
-        if response:
+        if response.status_code == 200:
+            response = response.json()
             print(f"Conduit created successfully: {response}")
             conduit = Conduit(
                 conduit_id=response["data"][0]["id"],
@@ -342,6 +348,8 @@ class Conduits:
             conduit.on_delete = self._on_conduit_delete
             self.conduits.append(conduit)
             return conduit
+        else:
+            response.raise_for_status()
 
     async def start(self):
         """Start the Conduits management by retrieving and refreshing Conduits and shards."""
