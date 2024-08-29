@@ -44,11 +44,11 @@ class Subscription:
 
 class User:
     """User class"""
-    def __init__(self, key=None, user_id=None, ws=None, subscriptions=None):
+    def __init__(self, key=None, user_id=None, subscriptions=None):
         self.id = user_id
         self.key = key
-        self.sub_dict = subscriptions
-        self.ws = ws
+        self.sub_dict = subscriptions or {}
+        self.queue = asyncio.Queue()  # Queue for managing outgoing messages
 
 
 class Users:
@@ -56,18 +56,30 @@ class Users:
     def __init__(self):
         self.users = {}
         self.refresh_tokens = {}
+        self.keys = {}
         self.limbo = set()
-    
-    def add_user(self, key=None, user_id=None, ws=None, subscriptions=None):
-        """Add a user to the users collection"""
-        new_user = User(key, user_id, ws, subscriptions)
+
+    def add_user(self, key=None, user_id=None, subscriptions=None):
+        """Add a user to the users collection."""
+        new_user = User(key, user_id, subscriptions=subscriptions)
         self.users[user_id] = new_user
+        if key:
+            self.keys[key] = user_id
+        return self.users[user_id]
     
     def get_user(self, key):
-        for k, d in self.users.items():
-            if d.key == key:
-                return self.users[k]
-        return False
+        """Get a user by key."""
+        user_id = self.keys.get(key)
+        if user_id:
+            return self.users.get(user_id)
+        return None  # Return None explicitly if user is not found
+
+    def remove_user(self, user_id):
+        """Remove a user from the users collection."""
+        user = self.users.pop(user_id, None)
+        if user:
+            self.keys.pop(user.key, None)
+            # No WebSocket close operation here, it's handled elsewhere
 
 
 
