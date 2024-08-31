@@ -1,133 +1,108 @@
-# Twitch EventSub Conduit Manager
+# Twitch Conduits Management
 
-This project provides a Python-based solution to manage Twitch EventSub Conduits and their associated shards. The system allows for creating, updating, and deleting conduits and shards, and automates interactions with the Twitch API.
+This Python module provides a set of classes and functions for managing Twitch EventSub conduits, shards, and subscriptions. The library uses `httpx` for asynchronous HTTP requests and supports creating, updating, deleting, and retrieving EventSub conduits and shards from the Twitch API.
 
 ## Table of Contents
 
-- [Features](#features)
-- [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Classes and Methods](#classes-and-methods)
+  - [Sending HTTP Requests](#sending-http-requests)
+  - [Managing Subscriptions](#managing-subscriptions)
+  - [Creating and Managing Conduits](#creating-and-managing-conduits)
+- [Classes and Functions](#classes-and-functions)
+  - [Subscription](#subscription)
+  - [User](#user)
+  - [Users](#users)
   - [Transport](#transport)
   - [Shard](#shard)
   - [Conduit](#conduit)
   - [Conduits](#conduits)
 - [License](#license)
 
-## Features
-
-- **Manage Twitch EventSub Conduits:** Create, update, and delete conduits using the Twitch API.
-- **Shard Management:** Dynamically create and update shards within conduits.
-- **Retry Mechanism:** Automatic retries for API requests that experience timeouts.
-- **Callback Handling:** Supports custom callback handling when conduits are deleted.
-
-## Requirements
-
-- Python 3.8+
-- `httpx` for making asynchronous HTTP requests
-
 ## Installation
 
-1. **Clone the repository:**
+Make sure you have Python 3.7 or higher installed. You also need to install `httpx` for making asynchronous HTTP requests:
 
-   ```bash
-   git clone https://github.com/WillPiledriver/twitchconduits.git
-   cd twitchconduits
-   ```
-
-2. **Install dependencies:**
-
-   ```bash
-   pip install httpx
-   ```
-
-3. **Set up environment variables:**
-
-   - `TWITCH_CLIENT_ID`: Your Twitch Client ID
-   - `TWITCH_CLIENT_SECRET`: Your Twitch Client Secret
-
-## Usage
-
-To start using the Conduit Manager, you can follow the example below:
-
-```python
-import asyncio
-from twitchconduits import Conduits
-
-async def main():
-    client_id = "your_client_id"
-    client_secret = "your_client_secret"
-    shard_count = 5
-
-    conduits = Conduits(client_id, client_secret)
-    await conduits.start()
-    new_conduit = await conduits.create_conduit(shard_count)
-    await new_conduit.create_shard("shard_key")
-
-asyncio.run(main())
+```bash
+pip install httpx
 ```
 
-## Classes and Methods
+## Usage
+### Sending HTTP Requests
 
-### `Transport`
+The `send_request` function sends an HTTP request with retry logic:
 
-- **Attributes:**
-  - `method`: The method used for the transport (default: `webhook`).
-  - `key`: A unique key for identifying the transport.
-  - `secret`: A generated SHA-256 hash secret.
-  - `callback`: A URL callback for the transport.
+```python
 
-- **Methods:**
-  - `to_dict()`: Returns the transport data as a dictionary.
+from your_module import send_request
 
-### `Shard`
+response = await send_request("GET", "https://api.twitch.tv/helix/eventsub/conduits", headers={"Authorization": "Bearer YOUR_TOKEN"})
+```
 
-- **Attributes:**
-  - `id`: The shard ID.
-  - `key`: A unique key for identifying the shard.
-  - `access_token`: Twitch API access token.
-  - `transport`: A `Transport` instance for the shard.
-  - `session_id`: The session ID for the shard.
-  - `status`: The status of the shard.
+## Managing Subscriptions
 
-- **Methods:**
-  - `update_from_dict(data)`: Updates the shard attributes from a dictionary.
-  - `to_dict()`: Converts the shard object to a dictionary.
+The `Subscription` class represents an individual subscription, and you can manage subscriptions by using the `create_subscriptions` and `delete_subscription` methods in the `Conduits` class.
 
-### `Conduit`
+## Creating and Managing Conduits
 
-- **Attributes:**
-  - `id`: The conduit ID.
-  - `shard_count`: The number of shards in the conduit.
-  - `access_token`: Twitch API access token.
-  - `client_id`: The Twitch client ID.
-  - `shards`: A list of `Shard` objects associated with the conduit.
-  - `on_delete`: A callback function to be called when the conduit is deleted.
+To create a new Twitch EventSub conduit:
+```python
+from your_module import Conduits
 
-- **Methods:**
-  - `to_dict()`: Converts the conduit object to a dictionary.
-  - `update_conduit(shard_count)`: Updates the shard count for the conduit.
-  - `delete_conduit()`: Deletes the conduit.
-  - `get_shards(status)`: Retrieves the shard information.
-  - `create_shard(key)`: Creates a new shard.
-  - `update_shards()`: Placeholder method for updating shards.
+conduits_manager = Conduits(client_id="YOUR_CLIENT_ID", client_secret="YOUR_CLIENT_SECRET", callback_url="YOUR_CALLBACK_URL")
+await conduits_manager.create_conduit(shard_count=1)
+```
 
-### `Conduits`
+## Classes and Functions
+### Subscription
 
-- **Attributes:**
-  - `client_id`: The Twitch client ID.
-  - `client_secret`: The Twitch client secret.
-  - `conduits`: A list of `Conduit` objects.
-  - `access_token`: Twitch API access token.
+A class representing a subscription for a user.
 
-- **Methods:**
-  - `_on_conduit_delete(conduit)`: A callback function that removes the conduit from the list when deleted.
-  - `get_app_access_token()`: Retrieves the Twitch application access token.
-  - `get_conduits()`: Retrieves the list of conduits.
-  - `create_conduit(shard_count)`: Creates a new conduit with the specified shard count.
-  - `start()`: Initializes the Conduit Manager by retrieving the access token and existing conduits.
+- `__init__(sub_id, user_id)`: Initializes the subscription with an ID and user ID.
+- `to_dict()`: Converts the subscription instance to a dictionary.
 
-## License
+### User
 
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
+A class representing a user in the Twitch EventSub system.
+
+- `__init__(key, user_id, subscriptions)`: Initializes a user with an optional key, user ID, and subscriptions.
+
+### Users
+
+A class for managing multiple users.
+
+- `add_user(key, user_id, subscriptions)`: Adds a user to the collection.
+- `get_user(key)`: Retrieves a user by their key.
+- `remove_user(user_id)`: Removes a user by their user ID.
+
+### Transport
+
+Represents the transport configuration for a subscription or conduit.
+
+- `__init__(callback_url, key, secret)`: Initializes the transport with a callback URL, key, and secret.
+- `to_dict()`: Returns a dictionary representation of the transport.
+
+### Shard
+
+Represents a single shard in the EventSub system.
+
+- `__init__(shard_id, access_token, callback_url, key, transport, session_id, status)`: Initializes a shard with its configuration details.
+- `update_from_dict(data)`: Updates shard instance properties from a dictionary.
+- `to_dict()`: Converts the shard instance to a dictionary.
+
+### Conduit
+
+Represents a Twitch EventSub conduit.
+
+- `__init__(conduit_id, shard_count, access_token, client_id, callback_url)`: Initializes a conduit.
+- `update_conduit(shard_count)`: Updates the shard count for a conduit.
+- `delete_conduit()`: Deletes a conduit.
+- `create_shard(key)`: Creates a new shard.
+
+### Conduits
+
+A class for handling multiple conduits.
+
+- `get_access_token()`: Retrieves an access token from Twitch.
+- `get_conduits()`: Fetches a list of conduits from Twitch.
+- `clean_up_subscriptions()`: Removes all non-enabled subscriptions.
