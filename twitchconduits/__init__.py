@@ -44,10 +44,14 @@ class Subscription:
 
 class User:
     """User class"""
-    def __init__(self, key=None, user_id=None, subscriptions=None):
-        self.id = user_id
-        self.key = key
-        self.sub_dict = subscriptions or {}
+    def __init__(self, user_dict):
+        self.id = user_dict["user_id"]
+        self.access_token = user_dict["access_token"]
+        self.refresh_token = user_dict["refresh_token"]
+        self.login = user_dict["login"]
+        self.expiry = user_dict["expiry"]
+        self.scopes = user_dict["scopes"]
+        self.code = user_dict["code"]
         self.queue = asyncio.Queue()  # Queue for managing outgoing messages
 
 
@@ -57,15 +61,14 @@ class Users:
         self.users = {}
         self.refresh_tokens = {}
         self.keys = {}
-        self.limbo = set()
 
-    def add_user(self, key=None, user_id=None, subscriptions=None):
+    def add_user(self, user_dict):
         """Add a user to the users collection."""
-        new_user = User(key, user_id, subscriptions=subscriptions)
-        self.users[user_id] = new_user
-        if key:
-            self.keys[key] = user_id
-        return self.users[user_id]
+        new_user = User(user_dict)
+        self.users[new_user.id] = new_user
+        self.keys[new_user.access_token] = new_user.id
+        self.refresh_tokens[new_user.refresh_token] = new_user.id
+        return self.users[new_user.id]
     
     def get_user(self, key):
         """Get a user by key."""
@@ -133,7 +136,8 @@ class Shard:
 
 class Conduit:
     """Conduit Class"""
-    def __init__(self, conduit_id, shard_count, access_token, client_id, callback_url):
+    def __init__(self, conduits, conduit_id, shard_count, access_token, client_id, callback_url):
+        self.conduits = conduits
         self.id = conduit_id
         self.shard_count = shard_count
         self.access_token = access_token
@@ -266,7 +270,9 @@ class Conduit:
                 response = await send_request("POST", url, headers, json=data)
                 if response.status_code == 202:
                     # print(f"Subscription '{subscription}' created successfully!")
-                    return response.json()
+                    r = response.json()
+                    self.conduits.subscriptions.add(r["data"][0]["id"])
+                    return r["data"]
             return (False, subscription)
 
         # Use asyncio.gather to create all subscriptions concurrently
@@ -298,6 +304,7 @@ class Conduits:
         self.callback_url = callback_url
         self.conduits: List[Conduit] = []
         self.access_token = None
+        self.subscriptions = set()
 
     def _on_conduit_delete(self, conduit):
         """Handle a Conduit deletion event"""
@@ -329,12 +336,18 @@ class Conduits:
         response = response.json()
         conduits_data = response.get("data", [])
 
-        self.conduits = [Conduit(conduit["id"], conduit["shard_count"], self.access_token, self.client_id, self.callback_url)
+        self.conduits = [Conduit(self, conduit["id"], conduit["shard_count"], self.access_token, self.client_id, self.callback_url)
                          for conduit in conduits_data]
 
         return self.conduits
     
-    async def get_subscriptions(self):
+    async def sync_subscriptions(self):
+        subs = await self.get_subscriptions()
+        self.subscriptions = set()
+        for s in subs:
+            self.subscriptions.add(s["id"])
+
+    async def get_subscriptions(self, user_id=None):
         """Retrieve the list of subscriptions for the current Conduits."""
         headers = {
             "Authorization": f"Bearer {self.access_token}",
@@ -346,6 +359,8 @@ class Conduits:
 
         while True:
             params = {"after": after}
+            if user_id is not None:
+                params["user_id"] = user_id
             response = await send_request("GET", url, headers, params=params)
             response = response.json()
             subscriptions.extend(response.get("data", []))
@@ -353,7 +368,7 @@ class Conduits:
             after = pagination.get("cursor")
             if not after:
                 break
-
+        
         return subscriptions
 
     async def delete_subscription(self, sub_id: str):
@@ -366,6 +381,7 @@ class Conduits:
 
         response = await send_request("DELETE", url, headers)
         if response.status_code ==  204:
+            self.subscriptions.remove(sub_id)
             return True
         else:
             print(f"Failed to delete subscription {sub_id}. Response: {response.json()}")
@@ -397,6 +413,7 @@ class Conduits:
             response = response.json()
             print(f"Conduit created successfully: {response}")
             conduit = Conduit(
+                conduits=self,
                 conduit_id=response["data"][0]["id"],
                 shard_count=response["data"][0]["shard_count"],
                 access_token=self.access_token,
@@ -416,3 +433,4 @@ class Conduits:
         for conduit in self.conduits:
             await conduit.get_shards()
             conduit.on_delete = self._on_conduit_delete
+        await self.sync_subscriptions()
