@@ -34,7 +34,7 @@ The `send_request` function sends an HTTP request with retry logic:
 
 ```python
 
-from your_module import send_request
+from twitchconduits import send_request
 
 response = await send_request("GET", "https://api.twitch.tv/helix/eventsub/conduits", headers={"Authorization": "Bearer YOUR_TOKEN"})
 ```
@@ -47,7 +47,7 @@ The `Subscription` class represents an individual subscription, and you can mana
 
 To create a new Twitch EventSub conduit:
 ```python
-from your_module import Conduits
+from twitchconduits import Conduits
 
 conduits_manager = Conduits(client_id="YOUR_CLIENT_ID", client_secret="YOUR_CLIENT_SECRET", callback_url="YOUR_CALLBACK_URL")
 await conduits_manager.create_conduit(shard_count=1)
